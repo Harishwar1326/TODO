@@ -3,5 +3,8 @@
   "private": true,
   "scripts": {
     "build": "cd frontend && npm install && npm run build && cd .. && cp -r frontend/dist dist"
+  },
+  "dependencies": {
+    "mongodb": "^6.8.0"
   }
 }
