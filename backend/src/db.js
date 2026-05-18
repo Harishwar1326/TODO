@@ -1,7 +1,16 @@
 import { MongoClient } from "mongodb";
 
-const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
+const isProductionDeployment = Boolean(process.env.VERCEL);
+const uri =
+  process.env.MONGODB_URI ||
+  (isProductionDeployment ? "" : "mongodb://localhost:27017");
 const databaseName = process.env.MONGODB_DB_NAME || "todo_app";
+
+if (!uri) {
+  throw new Error(
+    "MONGODB_URI is required on Vercel. Set it in the project environment variables.",
+  );
+}
 
 const client = new MongoClient(uri);
 

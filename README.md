@@ -29,6 +29,8 @@ Set these environment variables in Vercel:
 - `MONGODB_URI`
 - `MONGODB_DB_NAME`
 
+The backend uses `mongodb://localhost:27017` only for local development. On Vercel, `MONGODB_URI` must point to a real hosted MongoDB instance.
+
 ## Notes
 
 - Frontend build output is `frontend/dist`.
