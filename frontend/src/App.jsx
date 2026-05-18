@@ -1,145 +1,111 @@
 import { useEffect, useState } from "react";
-import { fetchExpenses, uploadInvoice, deleteExpense } from "./api";
-import ExpensesChart from "./ExpensesChart";
+import TaskForm from "./components/TaskForm";
+import TaskList from "./components/TaskList";
+import { createTask, deleteTask, getTasks, updateTask } from "./api/tasks";
 
-function formatCurrency(amount, currency = "USD") {
-  // Normalize common currency symbol inputs to ISO currency codes
-  const symbolMap = { "$": "USD", "€": "EUR", "£": "GBP", "₹": "INR" };
-  let code = currency || "USD";
-  if (typeof code === "string") {
-    code = code.trim();
-    if (symbolMap[code]) code = symbolMap[code];
-    code = code.toUpperCase();
-  } else {
-    code = "USD";
-  }
-
-  // Ensure we have a 3-letter ISO code, otherwise fallback to USD
-  if (!/^[A-Z]{3}$/.test(code)) code = "USD";
-
-  try {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: code,
-    }).format(amount);
-  } catch (e) {
-    return `${amount}`;
-  }
-}
+const emptyForm = {
+  title: "",
+  description: "",
+  editingId: null,
+};
 
 export default function App() {
-  const [file, setFile] = useState(null);
-  const [expenses, setExpenses] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  async function loadExpenses() {
-    try {
-      const data = await fetchExpenses();
-      setExpenses(data);
-    } catch (err) {
-      setError(err.message);
-    }
-  }
+  const [tasks, setTasks] = useState([]);
+  const [form, setForm] = useState(emptyForm);
+  const [status, setStatus] = useState({ loading: true, error: "" });
 
   useEffect(() => {
-    loadExpenses();
+    let active = true;
+
+    async function loadTasks() {
+      try {
+        const data = await getTasks();
+        if (active) {
+          setTasks(data);
+          setStatus({ loading: false, error: "" });
+        }
+      } catch (error) {
+        if (active) {
+          setStatus({ loading: false, error: error.message });
+        }
+      }
+    }
+
+    loadTasks();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   async function handleSubmit(event) {
     event.preventDefault();
-    setError("");
 
-    if (!file) {
-      setError("Please select an invoice image first.");
+    const title = form.title.trim();
+    const description = form.description ? form.description.trim() : "";
+    if (!title) {
       return;
     }
 
     try {
-      setLoading(true);
-      await uploadInvoice(file);
-      setFile(null);
-      event.target.reset();
-      await loadExpenses();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+      if (form.editingId) {
+        const updatedTask = await updateTask(form.editingId, title, description);
+        setTasks((currentTasks) => currentTasks.map((task) => (task.id === updatedTask.id ? updatedTask : task)));
+      } else {
+        const newTask = await createTask(title, description);
+        setTasks((currentTasks) => [newTask, ...currentTasks]);
+      }
+
+      setForm(emptyForm);
+      setStatus((current) => ({ ...current, error: "" }));
+    } catch (error) {
+      setStatus((current) => ({ ...current, error: error.message }));
     }
   }
 
+  function handleEdit(task) {
+    setForm({ title: task.title, description: task.description || "", editingId: task.id });
+  }
+
   async function handleDelete(id) {
+    const confirmed = window.confirm("Delete this task?");
+    if (!confirmed) {
+      return;
+    }
+
     try {
-      setLoading(true);
-      await deleteExpense(id);
-      await loadExpenses();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+      await deleteTask(id);
+      setTasks((currentTasks) => currentTasks.filter((task) => task.id !== id));
+      setStatus((current) => ({ ...current, error: "" }));
+    } catch (error) {
+      setStatus((current) => ({ ...current, error: error.message }));
     }
   }
 
   return (
-    <div className="app-shell">
-      <header className="hero">
-        <h1>Expense Tracker</h1>
-        <p>Upload invoice images. AI extracts, classifies, and saves to MongoDB.</p>
-      </header>
-
-      <section className="card">
-        <h2>Upload Invoice Image</h2>
-        <form onSubmit={handleSubmit} className="upload-form">
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => setFile(e.target.files?.[0] || null)}
-          />
-          <button type="submit" disabled={loading}>
-            {loading ? "Processing..." : "Upload and Save"}
-          </button>
-        </form>
-        {error ? <p className="error">{error}</p> : null}
+    <main className="app-shell">
+      <section className="hero-card">
+        <p className="eyebrow">Node.js + React CRUD</p>
+        <h1>Todo Manager</h1>
+        <p className="hero-copy">Create, read, update, and delete tasks using a tiny Node.js API and a React frontend.</p>
       </section>
-      <ExpensesChart expenses={expenses} />
 
-      <section className="card">
-        <h2>Saved Expenses</h2>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                  <th>Vendor</th>
-                  <th>Amount</th>
-                  <th>Date</th>
-                  <th>Category</th>
-                  <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-              {expenses.length === 0 ? (
-                <tr>
-                  <td colSpan="4">No expenses yet.</td>
-                </tr>
-              ) : (
-                expenses.map((expense) => (
-                  <tr key={expense._id}>
-                    <td>{expense.vendor}</td>
-                    <td>{formatCurrency(expense.amount, expense.currency)}</td>
-                    <td>{new Date(expense.date).toLocaleDateString()}</td>
-                    <td>{expense.category}</td>
-                    <td>
-                      <button className="danger" onClick={() => handleDelete(expense._id)}>
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+      <section className="content-card">
+        <TaskForm
+          title={form.title}
+          description={form.description}
+          onTitleChange={(value) => setForm((current) => ({ ...current, title: value }))}
+          onDescriptionChange={(value) => setForm((current) => ({ ...current, description: value }))}
+          onSubmit={handleSubmit}
+          submitLabel="Save changes"
+          isEditing={Boolean(form.editingId)}
+        />
+
+        {status.loading ? <p className="status-text">Loading tasks...</p> : null}
+        {status.error ? <p className="error-text">{status.error}</p> : null}
+
+        <TaskList tasks={tasks} onEdit={handleEdit} onDelete={handleDelete} />
       </section>
-    </div>
+    </main>
   );
 }

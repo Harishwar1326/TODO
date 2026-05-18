@@ -1,25 +1,30 @@
-import "dotenv/config";
-import express from "express";
-import cors from "cors";
+import app from "./app.js";
+import { closeDatabase, connectDatabase } from "./db.js";
 
-import { connectDB } from "./config/db.js";
-import expenseRoutes from "./routes/expenseRoutes.js";
+const port = process.env.PORT || 4000;
 
-const app = express();
-const PORT = process.env.PORT || 5001;
-const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/";
+async function startServer() {
+  try {
+    await connectDatabase();
 
-app.use(cors());
-app.use(express.json());
+    const server = app.listen(port, () => {
+      console.log(`Todo API listening on http://localhost:${port}`);
+      console.log(
+        `Connected to MongoDB at ${process.env.MONGODB_URI || "mongodb://localhost:27017"}`,
+      );
+    });
 
-app.get("/api/health", (_req, res) => {
-  res.json({ status: "ok" });
-});
+    const shutdown = async () => {
+      await closeDatabase();
+      server.close(() => process.exit(0));
+    };
 
-app.use("/api/expenses", expenseRoutes);
+    process.on("SIGINT", shutdown);
+    process.on("SIGTERM", shutdown);
+  } catch (error) {
+    console.error("Failed to start server:", error);
+    process.exit(1);
+  }
+}
 
-connectDB(MONGODB_URI).then(() => {
-  app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-  });
-});
+startServer();
