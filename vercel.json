@@ -1,12 +1,8 @@
 {
   "version": 2,
-  "builds": [
-    { "src": "frontend/package.json", "use": "@vercel/static-build", "config": { "distDir": "dist" } },
-    { "src": "api/tasks.js", "use": "@vercel/node" }
-  ],
+  "builds": [{ "src": "frontend/package.json", "use": "@vercel/static-build", "config": { "distDir": "dist" } }, { "src": "api/tasks.js", "use": "@vercel/node" }],
   "routes": [
-    { "src": "/api/tasks(?:/(.*))?", "dest": "/api/tasks.js" },
-    { "handle": "filesystem" },
-    { "src": "/(.*)", "dest": "/index.html" }
+    { "src": "^/api/tasks(?:/(.*))?$", "dest": "/api/tasks.js" },
+    { "src": "^/(.*)$", "dest": "/frontend/dist/index.html" }
   ]
 }
